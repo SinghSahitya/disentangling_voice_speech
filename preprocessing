@@ -1,0 +1,77 @@
+import librosa
+import os
+import numpy as np
+import joblib
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+import pickle
+
+# Function to load and extract MFCCs
+def extract_mfcc(audio_path, n_mfcc=13):
+    # Load the audio file
+    audio, sr = librosa.load(audio_path, sr=16000)  # Default to 16kHz sample rate
+    # Extract MFCCs
+    mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=n_mfcc)
+    # Average over time dimension
+    mfcc_mean = np.mean(mfcc.T, axis=0)
+    return mfcc_mean
+
+# Example usage: Process all audio files in a folder and extract features
+def process_librispeech_folder(dataset_path, output_path):
+    for root, _, files in os.walk(dataset_path):
+        for file in files:
+            if file.endswith(".flac"):
+                audio_path = os.path.join(root, file)
+                mfcc_features = extract_mfcc(audio_path)
+                
+                # Save features as .npy file
+                output_file = os.path.join(output_path, file.replace(".flac", ".npy"))
+                np.save(output_file, mfcc_features)
+                print(f"Saved MFCC for {file}")
+
+# Set paths to your dataset and where you want to store the preprocessed features
+librispeech_path = '/Users/nikhiljoshi/Desktop/paper_implementations/LibriSpeech'
+output_path = '/Users/nikhiljoshi/Desktop/paper_implementations'
+
+process_librispeech_folder(librispeech_path, output_path)
+
+
+# Path to your extracted MFCCs directory
+directory_path = '/Users/nikhiljoshi/Desktop/paper_implementations/extracted_MFCCs/'
+
+# Initialize lists to store the features and labels
+all_features = []
+all_labels = []
+
+# Iterate over all the files in the directory
+for file_name in os.listdir(directory_path):
+    if file_name.endswith('.npy'):  # Check if the file is a .npy file
+        file_path = os.path.join(directory_path, file_name)
+        
+        # Load the individual .npy file (features)
+        features = np.load(file_path)
+        all_features.append(features)  # Append the features to the list
+
+        # Extract speaker label from the file name or parent directory
+        # Assuming file names follow a pattern like 'speakerID_filename.npy' or you can extract from directory
+        speaker_id = file_name.split('_')[0]  # Modify this to match your file naming convention
+        all_labels.append(speaker_id)  # Append the speaker ID as the label
+
+# Convert the list of features and labels to NumPy arrays
+all_features = np.array(all_features)
+all_labels = np.array(all_labels)
+
+# Step 2: **Normalize the Features**
+scaler = StandardScaler()
+normalized_features = scaler.fit_transform(all_features.reshape(len(all_features), -1))
+
+# Saving preprocessed data (features and labels)
+def save_preprocessed_data(features, labels, output_file):
+    data = {'features': features, 'labels': labels}
+    with open(output_file, 'wb') as f:
+        pickle.dump(data, f)
+    print(f"Data saved to {output_file}")
+
+# Example usage: Saving the normalized features and their corresponding labels
+save_preprocessed_data(normalized_features, all_labels, 'preprocessed_librispeech_data.pkl')
+
