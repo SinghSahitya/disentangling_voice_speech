@@ -1,0 +1,85 @@
+import os
+import librosa
+import numpy as np
+
+# Directory containing IEMOCAP sessions
+base_dir = '/Users/nikhiljoshi/Desktop/ai_project/1'  # Set this to your IEMOCAP directory
+sessions = ['Session1', 'Session2', 'Session3', 'Session4', 'Session5']
+
+# Initialize empty lists to store data
+audio_data = []
+transcriptions = []
+emotion_labels = []
+
+# Helper function to read emotion annotations
+def read_emotion_labels(emotion_path):
+    emotion_dict = {}
+    with open(emotion_path, 'r') as file:
+        for line in file:
+            if line.startswith('['):  # Lines starting with [ contain the emotion label
+                tokens = line.strip().split('\t')
+                utterance_id = tokens[1]
+                emotion = tokens[2]
+                emotion_dict[utterance_id] = emotion
+    return emotion_dict
+
+# Loop through each session
+for session in sessions:
+    session_path = os.path.join(base_dir, session)
+    
+    # 1. Load the Emotion Annotations
+    emo_evaluation_path = os.path.join(session_path, 'dialog', 'EmoEvaluation')
+    for file_name in os.listdir(emo_evaluation_path):
+        if file_name.endswith('.txt'):  # Read emotion annotations
+            emotion_file_path = os.path.join(emo_evaluation_path, file_name)
+            emotion_dict = read_emotion_labels(emotion_file_path)
+    
+    # 2. Load the Transcriptions
+    transcription_path = os.path.join(session_path, 'dialog', 'transcriptions')
+    for file_name in os.listdir(transcription_path):
+         if file_name.endswith('.txt'):
+            with open(os.path.join(transcription_path, file_name), 'r') as f:
+                for line in f:
+                    line = line.strip()  # Remove any leading/trailing spaces
+                    if ': ' in line:  # Check if the line contains the expected delimiter
+                            utterance_id, text = line.split(': ', 1)
+                            transcriptions.append((utterance_id.strip(), text.strip()))
+                    else:
+                        print(f"Skipping line: {line}")  # Debug: check what lines are skipped
+
+    
+   # 3. Load Audio and Extract Features
+    sentence_audio_path = os.path.join(session_path, 'sentences', 'wav')
+    for root, _, files in os.walk(sentence_audio_path):
+        for file_name in files:
+            if file_name.endswith('.wav'):
+                utterance_id = file_name.split('.')[0]  # Get the utterance ID from filename
+                file_path = os.path.join(root, file_name)
+                
+                # Load the audio file using librosa
+                audio, sr = librosa.load(file_path, sr=16000)  # Load audio at 16kHz
+                
+                # Corrected MFCC extraction with keyword arguments
+                mfcc_features = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=13)  # Extract MFCC features
+                
+                # Store the data
+                audio_data.append((utterance_id, mfcc_features))
+
+
+    # 4. Match Emotion Labels with Audio and Transcriptions
+    for utterance_id, mfcc_features in audio_data:
+        if utterance_id in emotion_dict:
+            emotion = emotion_dict[utterance_id]
+            transcription = next((t for uid, t in transcriptions if uid == utterance_id), None)
+            
+            # Save or append your final data containing mfcc_features, transcription, and emotion
+            emotion_labels.append((mfcc_features, transcription, emotion))
+
+# After this, you can save your preprocessed data using pickle or joblib
+import pickle
+
+# Saving the dataset
+with open('iemocap_data.pkl', 'wb') as f:
+    pickle.dump(emotion_labels, f)
+
+print("Data saved successfully.")
