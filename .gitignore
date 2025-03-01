@@ -1,3 +1,7 @@
 dvs
 Paper
 IEMOCAP
+*.pkl
+preprocessed_librispeech_data.pkl
+iemocap_data.pkl
+preprocessed_iemocap_data.pkl
